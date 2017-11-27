@@ -6,9 +6,11 @@
 main:
 	li $v0,8        #take in input
 	la $a0,buffer   #load argument with byte space
-	li $a1,9        #allot byte space for string
+	li $a1,1001        #allot byte space for string
 	add $s0,$zero,$a0  #load user input into register
 	syscall
+	addi $t4,$zero,10 #load newline value into a temporary register
+	addi $t0,$t0,44 #load register with the ascii value of a comma
 
 count_string_loop:
 	lb $t5,0($t3) #load first byte of string
@@ -18,10 +20,13 @@ count_string_loop:
 	addi $t3,$t3,1 #change current byte, at the end of loop length of string is stored in $t6
 	j count_string_loop
 count_string_exit:
-	
-	
+	move $t3,$zero #initialize register with zero
+	move $t5,$zero #initialize register with zero
+	add $t3,$zero,$s0 #put value of string into register
 loop:
-
+	lb $t5,0($t3) #load first byte of string
+	beq $t4,$t5,loop_exit #checks to see if it is the end of the string, exits if equal
+	beq $zero,$t5,loop_exit ##checks to see if it is the end of the string, exits if equal	
 
 
 subprogram2_end:
