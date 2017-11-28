@@ -1,6 +1,8 @@
 .data
 	buffer: .space 1001
-	str2: .asciiz "NaN"
+	str1: .asciiz "NaN"
+	str2: .asciiz ","
+	str3: .asciiz "too large"
 .text
 	
 main:
@@ -20,22 +22,18 @@ count_string_loop:
 	addi $t3,$t3,1 #change current byte, at the end of loop length of string is stored in $t6
 	j count_string_loop
 count_string_exit:
+	
 	move $t3,$zero #initialize register with zero
 	move $t5,$zero #initialize register with zero
 	add $t3,$zero,$s0 #put value of string into register
 loop:
-	lb $t5,0($t3) #load first byte of string
+	jal validate_substr #calls validate substring subprogram, returns substring
 	beq $t4,$t5,loop_exit #checks to see if it is the end of the string, exits if equal
-	beq $zero,$t5,loop_exit ##checks to see if it is the end of the string, exits if equal	
-
-
-subprogram2_end:
-
-
-
-
-subprogram3_end:
-
+	beq $zero,$t5,loop_exit #checks to see if it is the end of the string, exits if equal	
+    beq $t5,44,call_prog3  #if character is a comma, it jumps to program3 call
+    jal subprogram_2 #calls subprogram2 if character is not a comma
+call_prog3:
+	jal subprogram_3 #calls subprogram3
 
 
 
@@ -55,6 +53,7 @@ invalid:
 	
 	
 subprogram_1:
+	move $t2,$zero #initializes register 2 to zero
 	blt $t1,48,invalid #checks if character is less than 48, branches to invalid section if true
 	blt $t1,58,check_num #goes to get value of char since it's valid
 	blt $t1,65,invalid #checks if character is less than 65, branches to invalid section if true
@@ -66,15 +65,15 @@ subprogram_1:
 #converts character to its decimal value
 check_num:
 	addi $t2,$t1,-48  #convert 0-9 ascii to 0-9 hex
-	j subprogram_2  #jump to subprogram 2
+	j $ra  #jumps to return address
 
 check_uppercase:
 	addi $t2,$t1,-55   #convert A-F ascii to 10-15 hex
-	j subprogram_2  #jump to subprogram 2
+	j $ra  #jumps to return address
 
 check_lowercase:
 	addi $t2,$t1,-87     #convert a-f ascii to 10-15 hex
-	j subprogram_2  #jump to subprogram 2
+	j $ra  #jumps to return address
 
 
 #converts a hexadecimal string to a decimal integer by calling
@@ -92,3 +91,28 @@ subprogram_2:
 
 #displays an unsigned decimal integer
 subprogram_3:
+
+
+
+
+
+
+
+
+
+
+
+#this subprogram checks the validity of a substring
+validate_substr:
+	move $t9,$zero #initializes a new register with zero that will hold the substring
+	move $s1,$zero #initializes a register with zero to act as a counter
+	
+substr_loop:
+	lb $t5,0($t3) #load first byte of string
+	
+	
+
+	
+
+
+	
