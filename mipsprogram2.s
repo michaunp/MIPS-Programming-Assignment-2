@@ -1,5 +1,6 @@
 .data
 	buffer: .space 1001
+	temp_str: .space 1001
 	str1: .asciiz "NaN"
 	str2: .asciiz ","
 	str3: .asciiz "too large"
@@ -12,8 +13,6 @@ main:
 	add $s0,$zero,$a0  #load user input into register
 	syscall
 	
-	move $t3,$zero #initialize register with zero
-	move $t5,$zero #initialize register with zero
 	add $t3,$zero,$s0 #put value of string into register
 loop:
 	move $t4,$zero #clears contents of register $t4
@@ -26,7 +25,7 @@ loop:
     lw $s2,4($sp) #read subprogram2 value from stack
     beq $s2,$zero,not_num #branches if string wasn't a number
 	beq $t5,10,loop_exit #checks to see if it is the end of the string, exits if equal
-	beq $zero,$t5,loop_exit #checks to see if it is the end of the string, exits if equal
+	beq $t5,$zero,loop_exit #checks to see if it is the end of the string, exits if equal
 call_prog3:
 	sw $s2,0($sp) #load subprogram3 parameters using stack
 	jal subprogram_3 #calls subprogram3
@@ -40,7 +39,7 @@ end:
 	syscall
 
 invalid:
-	la $a0,str2                  #load argument with invalid string
+	la $a0,str1                  #load argument with invalid string
 	li $v0,4                     #load with code to print a string
 	syscall
 	jr $ra	                     #jumps to return address
@@ -75,7 +74,10 @@ check_lowercase:
 #subprogram1 in a loop and adding it to a total sum
 #still need to implement loop that calls subprogram1, terminating condition is a comma character or over 8 characters 
 subprogram_2:
-	add $t6,$v0,$zero             #copy parameter with substring into $t6
+	add $t6,$a0,$zero             #copy parameter with substring into $t6
+	addi $a0, $t6, 0              #load back into argument register
+	li $v0, 4
+	syscall
 	move $t7,$zero                #initialize sum register
 sum_loop:
 	lb $s3,0($t2)                 #load first character into $s3
@@ -100,9 +102,24 @@ sum_loop:
 subprogram_3:
 #have condition that checks if output is 8 characters, if so does special output
 #otherwise just prints unsigned integer and checks to see whether next character in the string is the last character
+    addi $s4,$zero,7                  #initializes a register with the value seven
+	bgt $s1,$s4,special_output        #jumps to special output register if length of string is less than zero
+	li $v0,1                          #load code for printing an integer
+	add $a0,$zero,$t7                 #load argument with decimal number
+	syscall
 
-
-
+special_output:
+	addi $s5,$zero,10000         #initializes register with 10,000 for special output
+	divu $t7,$s5                 #divide sum by 10,000
+	mflo $s6                     #move quotient from low
+	mfhi $s7                     #move remainder from high
+	li $v0,1                     #load code to print integer
+	add $a0,$zero,$s6            #load argument with quotient
+	syscall
+	li $v0,1                     #load code to print integer
+	add $a0,$zero,$s7            #load argument with remainder
+	syscall
+	jr $ra     	                 #jump to return address
 
 
 
@@ -115,7 +132,8 @@ subprogram_3:
 validate_substr:
 	move $t9,$zero #initializes a new register with zero that will hold the substring
 	move $s1,$zero #initializes a register with zero to act as a counter
-	sw $ra,0($t0) #store the return address in a register
+	addi $sp,$sp,-4 #reserve space for stack
+	sw $ra,0($sp) #store the return address in the stack
 	
 substr_loop:
 	lb $t5,0($t3) #load first byte of string
@@ -127,9 +145,9 @@ substr_loop:
     jal read_chars #calls read_chars subprogram
 
 validate_exit:
-	add $v0,$t9,$zero #put return string in return register
-	move $ra,$zero #clear return address
-	lw $ra,0($t0) #put correct return address in $ra
+	la $v0, temp_str
+	lw $ra,0($sp) #put correct return address in $ra
+	addi $sp,$sp,4 #add space back to stack
 	jr $ra #return from function
 	
 ignore_space:
@@ -137,21 +155,26 @@ ignore_space:
 	j substr_loop #jumps to beginning of loop	
 
 read_chars:
-	sw $ra,4($t0) #store return address in a register
+	la $t8, temp_str
+	addi $sp,$sp,-4 #reserve space for stack
+	sw $ra,0($sp) #store return address in the stack
 read_loop:
 	bge $s1,9,call_invalid_large #branches to call invalid subprogram instruction if substring greater than 8 characters
 	beq $t5,32,check_rem #checks if remaining characters are tabs or spaces
 	beq $t5,9,check_rem #checks if remaining characters are tabs or spaces
 	beq $t5,44,read_loop_exit #exits loop if character is a comma
-	sb $t5,0($t9) #adds character to the new substring
-	addi $s1,$s1,1 #increments counter
-    addi $t9,$t9,1 #changes current byte to next byte	
+	beq $t5,$zero,read_loop_exit #exits loop if character is a new line
+	beq $t5,10,read_loop_exit #exits loop if character is a null
+	sb $t5, 0($t8)   #save character to string
+	addi $t8, $t8, 1 #change current string
+	addi $s1,$s1,1 #increments counter, which is the length of the string
     addi $t3,$t3,1 #changes current byte of string to next byte
     lb $t5,0($t3) #loads the next byte into register $t5
     j read_loop #loops to check next byte
 read_loop_exit:
-	move $ra,$zero #clear return address
-	lw $ra,4($t0) #load correct return address 
+	la $t8, temp_str
+	lw $ra,0($sp) #load correct return address
+	addi $sp,$sp,4 #add space back to stack
 	jr $ra #jump return
 
 
@@ -161,9 +184,11 @@ check_rem:
 	beq $t5,32,check_rem #checks if remaining characters are tabs or spaces
 	beq $t5,9,check_rem #checks if remaining characters are tabs or spaces
 	beq $t5,44,read_loop_exit #exits loop if character is a comma
-	move $t9,$zero #clears substring
-	move $a0,$zero #clears argument register
-	add $a0,$t9,$zero #puts contents of $t9 in $a0
+	beq $t5,10,read_loop_exit #exits loop if character is a new line
+	beq $t5,$zero,read_loop_exit #exits loop if character is null
+	la $t8,temp_str #load address of string
+	sb $zero,0($t8) #change byte to zero
+	add $a0,$t8,$zero #puts address of $t8 in $a0
 	jal invalid
 	j read_loop_exit
 
