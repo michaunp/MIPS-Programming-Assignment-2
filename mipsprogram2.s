@@ -13,11 +13,13 @@ main:
 	add $s0,$zero,$a0                                    #load user input into register
 	syscall
 	
-	add $t3,$zero,$s0 #put value of string into register
+	add $t3,$zero,$s0                                    #put value of string into register
+	move $s0, $zero                                      #clear $s0                                     
 loop:
 	move $t4,$zero                                       #clears contents of register $t4
-	j validate_substr                                  #calls validate substring subprogram, returns substring
+	j validate_substr                                    #calls validate substring subprogram, returns substring
 validate_substr_return:
+	addi $s0, $s0, 1                                     #increment function called counter
 	add $t4,$v0,$zero                                    #puts return value of validate_substr in a register
 	lb $t6,0($t4)                                        #loads first byte of string
 	beq $t6,$zero,loop                                   #substring wasn't a number, jumps to check next substring
@@ -33,7 +35,8 @@ call_prog3:
 	jal subprogram_3                                     #calls subprogram3
 	j loop                                               #loops to check next substring
 not_num:
-	beq $t5,44,loop                                      #loops to check next substring if string wasn't valid
+	bne $t5, 10, loop                                    #loops to check next substring if string wasn't valid
+	bne $t5, $zero, loop                                 #loops to check next substring if string wasn't valid
 loop_exit:
 		
 end:
@@ -59,7 +62,11 @@ nan_exit:
 	lb $t5, 0($t3)               #loads current character
 	beq $t5, 10, end             #jumps to end of program if character is new line
 	beq $t5, $zero, end          #jumps to end of program if character is null
+	addi $s6, $t3, -2
+	lb $s6, 0($t3)
+	beq $s6, 44, skip_iteration
 	addi $t3,$t3,1               #change current byte to next byte of string
+skip_iteration:
 	jr $ra	                     #jumps to return address
 	
 invalid_large:
@@ -81,7 +88,11 @@ large_exit:
 	lb $t5, 0($t3)               #loads current character
 	beq $t5, 10, end             #jumps to end of program if character is new line
 	beq $t5, $zero, end          #jumps to end of program if character is null
-	addi $t3,$t3,1                           #change current byte to next byte of string
+	addi $s6, $t3, -2
+	lb $s6, 0($t3)
+	beq $s6, 44, skip_iteration_2
+	addi $t3,$t3,1               #change current byte to next byte of string
+skip_iteration_2:
 	jr $ra	                     #jumps to return address
 
 	
@@ -150,6 +161,7 @@ sum_loop:
 	
 sum_exit:
 	addi $sp, $sp, -4             #reserve space on the stack
+	beq $t7,$zero, zero_string    #checks to see if hex string is all zeros
 	sw $t7, 0($sp)                #save decimal value to the stack
 	j subprogram_2_return         #jumps back to beginning of loop
 
@@ -158,11 +170,18 @@ sum_exit_invalid:
 	sw $t9, 0($sp)                #save decimal value to the stack
 	j subprogram_2_return
 
+zero_string:
+	move $t7, $zero
+	addi $t7, $t7, 0
+	sw $t7, 0($sp)                #save decimal value to the stack
+	j subprogram_2_return         #jumps back to beginning of loop
 
 #displays an unsigned decimal integer
 subprogram_3:
 #have condition that checks if output is 8 characters, if so does special output
 #otherwise just prints unsigned integer and checks to see whether next character in the string is the last character
+    move $s6, $zero
+    move $s7, $zero
     addi $s4,$zero,7                  #initializes a register with the value seven
 	bgt $s1,$s4,special_output        #jumps to special output register if length of string is less than zero
 	li $v0,1                          #load code for printing an integer
@@ -175,6 +194,8 @@ subprogram_3:
 	li $a0, ','                       #load argument with a comma
 	syscall
 	addi $t3,$t3,1                    #change current byte to next byte of string
+	lb $t6, 0($t3)
+	beq $t6, 44, reverse_in_string
     jr $ra                            #returns from function
 special_output:
 	addi $s5,$zero,10000         #initializes register with 10,000 for special output
@@ -182,6 +203,7 @@ special_output:
 	divu $t7,$s5                 #divide sum by 10,000
 	mflo $s6                     #move quotient from low
 	mfhi $s7                     #move remainder from high
+    beq $s6, $zero, ignore_zero  #branches to ignore printing extra zero
 	li $v0,1                     #load code to print integer
 	add $a0,$zero,$s6            #load argument with quotient
 	syscall
@@ -195,19 +217,33 @@ special_output:
 	li $a0, ','                  #load argument with a comma
 	syscall
 	addi $t3,$t3,1               #change current byte to next byte of string
+	lb $t6, 0($t3)
+	beq $t6, 44, reverse_in_string
 	jr $ra     	                 #jump to return address
 
 
+ignore_zero:
+	li $v0,1                     #load code to print integer
+	add $a0,$zero,$s7            #load argument with remainder
+	syscall
+	lb $t5, 0($t3)               #loads current character
+	beq $t5, 10, end             #jumps to end of program if character is new line
+	beq $t5, $zero, end          #jumps to end of program if character is null
+	li $v0,11                    #load syscall to print a character
+	li $a0, ','                  #load argument with a comma
+	syscall
+	addi $t3,$t3,1               #change current byte to next byte of string
+	jr $ra     	                 #jump to return address
 
 
-
-
+reverse_in_string:
+	addi $t3, $t3, -1
+	jr $ra
 
 
 #this subprogram checks the validity of a substring returns substring if spacing is correct, otherwise jumps to invalid function
 validate_substr:
-	lb $t5, 0($t3)                           #load byte into register
-	beq $t5,44,check_empty                   #checks if current character is a comma, and branches to check empty if true
+	la $t8, temp_str                         #load string space into $t8
 clear_string:
 	beq $s1,$zero,clear_exit                 #exit loop if counter is zero
 	sb $zero,0($t8)                          #save zero to string
@@ -216,6 +252,13 @@ clear_string:
 	j clear_string                           # loop to clear_string
 clear_exit:
 	move $s1,$zero                           #initializes a register with zero to act as a counter
+	beq $s0, 0, preserve_character           #don't change character if it's the first iteration
+	lb $t5, 0($t3)
+	beq $t5,44,check_empty                   #checks if current character is a comma, and branches to check empty if true
+	#addi $t3,$t3, 1                          #change current byte
+preserve_character:
+	lb $t5, 0($t3)                           #load byte into register
+	beq $t5,44,check_empty                   #checks if current character is a comma, and branches to check empty if true
 substr_loop:
 	lb $t5,0($t3)                            #load first byte of string
 	beq $t5,44,check_empty                   #exits loop if character is a comma
@@ -249,10 +292,10 @@ read_loop:
 	beq $t5,44,read_loop_exit                #exits loop if character is a comma
 	beq $t5,$zero,read_loop_exit             #exits loop if character is a new line
 	beq $t5,10,read_loop_exit                #exits loop if character is a null
+	addi $t3,$t3,1                           #changes current byte of string to next byte
 	sb $t5, 0($t8)                           #save character to string
 	addi $t8, $t8, 1                         #change current string
 	addi $s1,$s1,1                           #increments counter, which is the length of the string
-    addi $t3,$t3,1                           #changes current byte of string to next byte
     lb $t5,0($t3)                            #loads the next byte into register $t5
     j read_loop                              #loops to check next byte
 read_loop_exit:
@@ -292,11 +335,20 @@ ignore_rest:
 	
 	
 check_empty:
-	bne $s1,$zero,validate_exit_pass_comma      #checks if non-empty string after comma
-	jal invalid_nan                             #calls invalid function
-	j validate_exit                             #jumps to exit of validation function	
+	addi $t6, $t3, -1
+	lb $t6, 0($t6)
+	beq $t6, 44, j_invalid_nan
+	beq $t6, $zero, j_invalid_nan
+	beq $t6, 10, j_invalid_nan
+	beq $t6, 32, space_with_comma
+	beq $t6, 9, space_with_comma
+	j validate_exit_pass_comma                  #jumps to exit validation function
+j_invalid_nan:
+	jal invalid_nan
+	addi $t3, $t3, 1
+	j validate_exit	
 	
 	
-	
-	
+space_with_comma:
+	beq $s1, $zero, j_invalid_nan
 	
